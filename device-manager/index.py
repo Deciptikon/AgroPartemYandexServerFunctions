@@ -1,4 +1,6 @@
 from common.constants import (
+    NAME_TABLES,
+    DATA_FIELDS,
     HTTP_SUCCESS,
     HTTP_ERROR
 )
@@ -16,6 +18,7 @@ from common.http_manager import (
 from common.table_manager import (
     get_table,
     get_items,
+    get_user,
 )
 from common.datetime_manager import (
     create_timestamp,
@@ -38,20 +41,14 @@ def handler(event, context):
         return return_ERROR()
 
     # получаем доступ к данным пользователя
-    table = get_table('user-table')
+    user_table = get_table(NAME_TABLES.USER_TABLE)
     print("Читаем данные")
 
-    # Список всех записей с этим user_name
-    items = get_items(table=table, key='user_name', val=p['user_name'])  
-    print(items)
-
-    if len(items) == 0:
-        # если записей нет, Ошибка.
-        print("Пользователь не обнаружен")
+    # Если пользователь найден
+    user_data = get_user(table=user_table, user_name=p[DATA_FIELDS.USER_NAME] )
+    if not user_data:
         return return_ERROR()
     
-    # Если пользователь найден
-    user_data = items[0]
     local_secret_key = user_data.secret_key
     
     if not is_valid_sign(p, secret_key = local_secret_key):
@@ -60,20 +57,20 @@ def handler(event, context):
 ##########       Если все данные валидны       ##########
     
     # Если пользователь инициирует процедуру привязки
-    if p.get('bind_device'):
+    if p.get(DATA_FIELDS.BIND_DEVICE):
         # проверяем, существует ли ожидающее устройство с serial_key
         # генерируем ключ привязки и записываем в ожидающее устройство
         pass
 
     # Если пользователь запрашивает проверку ключа привязки
-    if p.get('check_bind_key'):
+    if p.get(DATA_FIELDS.CHECK_BIND_KEY):
         # проверяем, существует ли ожидающее устройство с serial_key
         # проверяем, валиден ли bind_key
         # генерируем секретный ключ и записываем в ожидающее устройство
         pass
 
     # Если пользователь запрашивает список своих устройств
-    if p.get('get_list_devices'):
+    if p.get(DATA_FIELDS.GET_LIST_DEVICES):
         # получаем список устройств пользователя
         list_devices = {
             '12345-67890-RTYBV': {
@@ -87,13 +84,13 @@ def handler(event, context):
                 }
             }
         data = {
-            'user_name': 'VolodyaFarmer',
-            'list_devices': list_devices
+            DATA_FIELDS.USER_NAME: 'VolodyaFarmer',
+            DATA_FIELDS.LIST_DEVICES: list_devices
         }
-        return answer_to_web(HTTP_SUCCESS['code'], HTTP_SUCCESS['message'], data = data)
+        return answer_to_web(HTTP_SUCCESS.CODE, HTTP_SUCCESS.MESSAGE, data = data)
     
     # Если пользователь запрашивает удаление устройства serial_key
-    if p.get('delete_device'):
+    if p.get(DATA_FIELDS.DELETE_DEVICE):
         # проверяем, существует ли привязанное устройство с serial_key
         pass
 

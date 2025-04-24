@@ -1,6 +1,7 @@
 import os
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.constants import NAME_TABLES
 
 # Получение таблицы
 def get_table(table_name):
@@ -19,3 +20,17 @@ def get_items(table, key: str, val: str):
         KeyConditionExpression=Key(key).eq(val)
     )
     return res.get('Items', [])  # Список всех записей с значением val по ключу key
+
+def get_user(table, user_name: str):
+    if user_name == '':
+        return None
+    
+    items = get_items(
+        table = table, 
+        key = NAME_TABLES.USER_TABLE, 
+        val = user_name)
+    
+    if len(items) == 1:
+        return items[0]
+    else:
+        return None

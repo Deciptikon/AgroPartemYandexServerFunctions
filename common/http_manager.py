@@ -20,9 +20,9 @@ def answer_to_web(code: int, message: str, data = ''):
 
 # Успешный ответ сервера
 def return_SUCCESS(data = ''):
-    return answer_to_web(HTTP_SUCCESS['code'], HTTP_SUCCESS['message'], data)
+    return answer_to_web(HTTP_SUCCESS.CODE, HTTP_SUCCESS.MESSAGE, data)
 
 # Ошибка сервера
 def return_ERROR(data = ''):
-    return answer_to_web(HTTP_ERROR['code'], HTTP_ERROR['message'], data)
+    return answer_to_web(HTTP_ERROR.CODE, HTTP_ERROR.MESSAGE, data)
 
