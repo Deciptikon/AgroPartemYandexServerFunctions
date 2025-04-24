@@ -1,18 +1,23 @@
-import os
-import boto3
-from datetime import datetime
-import json 
-
-from common.utils import (
+from common.constants import (
+    HTTP_SUCCESS,
+    HTTP_ERROR
+)
+from common.validation_manager import (
     is_valid_user_name,
     is_valid_serial_key,
     is_valid_sign,
     is_valid_timestamp,
+)
+from common.http_manager import (
     answer_to_web,
     return_SUCCESS,
     return_ERROR,
+)
+from common.table_manager import (
     get_table,
     get_items,
+)
+from common.datetime_manager import (
     create_timestamp,
     datetime_diff,
 )
@@ -30,7 +35,7 @@ def handler(event, context):
         or not is_valid_timestamp(p)
         or not is_valid_serial_key(p)
     ):
-        return answer_to_web(400, 'Ошибка.')
+        return return_ERROR()
 
     # получаем доступ к данным пользователя
     table = get_table('user-table')
@@ -43,14 +48,14 @@ def handler(event, context):
     if len(items) == 0:
         # если записей нет, Ошибка.
         print("Пользователь не обнаружен")
-        return answer_to_web(400, 'Ошибка.')
+        return return_ERROR()
     
     # Если пользователь найден
     user_data = items[0]
     local_secret_key = user_data.secret_key
     
     if not is_valid_sign(p, secret_key = local_secret_key):
-        return answer_to_web(400, 'Ошибка.')
+        return return_ERROR()
     
 ##########       Если все данные валидны       ##########
     
@@ -69,7 +74,23 @@ def handler(event, context):
 
     # Если пользователь запрашивает список своих устройств
     if p.get('get_list_devices'):
-        pass
+        # получаем список устройств пользователя
+        list_devices = {
+            '12345-67890-RTYBV': {
+                'name': "TestName"
+                },
+            '2G3J6-228GT-QNI85': {
+                'name': "Опрыскиватель"
+                },
+            '00000-ABCDE-1A2B0': {
+                'name': "Новый 777"
+                }
+            }
+        data = {
+            'user_name': 'VolodyaFarmer',
+            'list_devices': list_devices
+        }
+        return answer_to_web(HTTP_SUCCESS['code'], HTTP_SUCCESS['message'], data = data)
     
     # Если пользователь запрашивает удаление устройства serial_key
     if p.get('delete_device'):
@@ -77,5 +98,5 @@ def handler(event, context):
         pass
 
     # Если все параметры валидны, но ничего не запрашивается
-    return answer_to_web(200, 'Успешно.')
+    return return_SUCCESS()
     
