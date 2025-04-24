@@ -5,7 +5,6 @@ import json
 
 from common.utils import (
     is_valid_user_name,
-    is_valid_user_password,
     is_valid_serial_key,
     is_valid_sign,
     is_valid_timestamp,
@@ -38,7 +37,7 @@ def handler(event, context):
     print("Читаем данные")
 
     # Список всех записей с этим user_name
-    items = get_items(key='user_name', val=p['user_name'])  
+    items = get_items(table=table, key='user_name', val=p['user_name'])  
     print(items)
 
     if len(items) == 0:
@@ -77,6 +76,6 @@ def handler(event, context):
         # проверяем, существует ли привязанное устройство с serial_key
         pass
 
-    # Если все параметры валидны
+    # Если все параметры валидны, но ничего не запрашивается
     return answer_to_web(200, 'Успешно.')
     

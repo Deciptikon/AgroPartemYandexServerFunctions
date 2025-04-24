@@ -158,7 +158,7 @@ def get_table(table_name):
     )
     return ydb_docapi_client.Table(table_name)
 
-def get_items(key: str, val: str):
+def get_items(table, key: str, val: str):
     res = table.query(
         KeyConditionExpression=Key(key).eq(val)
     )
