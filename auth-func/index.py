@@ -1,28 +1,23 @@
 from common.constants import (
     NAME_TABLES,
-    HTTP_SUCCESS,
-    HTTP_ERROR
+    DATA_FIELDS,
 )
 from common.validation_manager import (
     is_valid_user_name,
     is_valid_user_password,
-    is_valid_serial_key,
-    is_valid_sign,
     is_valid_timestamp,
 )
 from common.http_manager import (
-    answer_to_web,
     return_SUCCESS,
     return_ERROR,
 )
 from common.table_manager import (
     get_table,
-    get_items,
     get_user,
 )
 from common.datetime_manager import (
     create_timestamp,
-    datetime_diff,
+    datetime_diff, # по хорошему, нужно проверить срок действия secret_key
 )
 from common.crypto_manager import (
     generate_secret_key,
@@ -35,90 +30,70 @@ def handler(event, context):
     p = event.get('queryStringParameters', {})
     print(p)
     
-    # Проверяем валидность всех параметров
-    a = is_valid_user_name(p)
-    print(a)
-    #b = is_valid_sign(p)
-    #print(b)
-    #c = is_valid_timestamp(p)
-    #print(c)
+########## Проверяем валидность всех параметров ##########
+    if (
+        not is_valid_user_name(p)
+        or not is_valid_timestamp(p)
+        or not is_valid_user_password(p)
+    ):
+        return return_ERROR()
 
-    # Если все параметры валидны
-    if a:
-        print(p['user_name'])
-        
-        # Получаем таблицу
-        user_table = get_table(NAME_TABLES.USER_TABLE)
+    # Получаем таблицу
+    user_table = get_table(NAME_TABLES.USER_TABLE)
 
-        print("Читаем данные")
-        user_data = get_user(table=user_table, user_name=p['user_name'] )
+    # Если пользователь найден
+    user_data = get_user(table=user_table, user_name=p[DATA_FIELDS.USER_NAME] )
+    if not user_data:
+# Если пользователь не существует, 
+# регистрируем нового пользователя
+        timestamp = create_timestamp()
+        new_item = {
+            DATA_FIELDS.USER_PASSWORD: str(p[DATA_FIELDS.USER_PASSWORD]),
+            DATA_FIELDS.USER_NIKNAME: str('User_' + timestamp),
+            DATA_FIELDS.TIMESTAMP: str(timestamp),
+            DATA_FIELDS.USER_NAME: str(p[DATA_FIELDS.USER_NAME]),
+        }
+        try:
+            response = user_table.put_item(Item = new_item)
+            return return_SUCCESS(data=new_item)
+    
+        except Exception as e:
+            # Возвращаем ошибку, если запись в БД не удалась
+            return return_ERROR()
+    
+# Если пользователь существует
+# проверяем пароль
+    save_pass = user_data[DATA_FIELDS.USER_PASSWORD]
+    if save_pass != p[DATA_FIELDS.USER_PASSWORD]:
+        return return_ERROR()
+    
+    # Если пароль верный, генерируем секретный ключ
+    secret_key = generate_secret_key(64)
 
-# Если пользователь найден
-        if user_data:
-            print("запись есть, проверяем пароль")
-            
-            save_pass = user_data['user_password']
-            if save_pass == p['user_password']:
-                # пароли совпадают, передаём информацию пользователю
-                print("пароли совпадают")
-                # генерируем векретный ключ
-                secret_key = generate_secret_key(64)
+    timestamp = create_timestamp()
 
-                timestamp = create_timestamp()
+    # формируем ответ
+    item = {
+        DATA_FIELDS.USER_PASSWORD: str(user_data[DATA_FIELDS.USER_PASSWORD]),
+        DATA_FIELDS.USER_NIKNAME: str(user_data[DATA_FIELDS.USER_NIKNAME]),
+        DATA_FIELDS.LIST_DEVICES: str(user_data[DATA_FIELDS.LIST_DEVICES]),
+        DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),
+        DATA_FIELDS.TIMESTAMP: str(timestamp),
+        DATA_FIELDS.SECRET_KEY: str(secret_key),
+    }
+    print(item)
 
-                # формируем ответ
-                item = {
-                    'user_name': str(user_data['user_name']),
-                    'user_password': str(user_data['user_password']),
-                    'timestamp': str(timestamp),
-                    'user_nikname': str(user_data['user_nikname']),
-                    'secret_key': str(secret_key)
-                }
-                print(item)
-
-                # записываем токен и время его создания в текущего пользователя
-                try:
-                    response = user_table.put_item(Item = item)
-            
-                    # Если запись прошла успешно, возвращаем успешный ответ с новым токеном
-                    return answer_to_web(200, 'Авторизация успешна', data = item)
-        
-                except Exception as e:
-                # Возвращаем ошибку, если запись в БД не удалась
-                    return answer_to_web(500, 'Ошибка авторизации', data = str(e))
-
-            else:
-                # пароли не совпадают, отправляем ошибку
-                print("пароли не совпадают")
-                return answer_to_web(401, 'Ошибка авторизации')
-
-# если записей нет, регестрируем нового пользователя
-        else:
-            print("регестрируем нового пользователя")
-
-            # Генерируем timestamp
-            timestamp = create_timestamp()
-
-            new_item = {
-                'user_name': p['user_name'],
-                'user_password': p['user_password'],
-                'timestamp': timestamp,
-                'user_nikname': 'User_' + timestamp
-            }
-
-            try:
-                response = user_table.put_item(Item = new_item)
-            
-                # Возвращаем успешный ответ
-                return answer_to_web(200, 'Регистрация успешна', data = new_item)
-        
-            except Exception as e:
-                # Возвращаем ошибку, если запись в БД не удалась
-                return answer_to_web(500, 'Ошибка регистрации', data = str(e))
-
-            
-                
-    else:
-        # Возвращаем ошибку, если параметр 'name' отсутствует или пуст
-        return answer_to_web(400, 'Параметры отсутствуют или пусты')
+    # записываем токен и время его создания в текущего пользователя
+    try:
+        response = user_table.put_item(Item = item)
+        # Если запись прошла успешно, возвращаем успешный ответ с новым токеном
+        data = {
+            DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),
+            DATA_FIELDS.TIMESTAMP: str(timestamp),
+            DATA_FIELDS.SECRET_KEY: str(secret_key),
+        }
+        return return_SUCCESS(data=data)
+    except Exception as e:
+        # Возвращаем ошибку, если запись в БД не удалась
+        return return_ERROR()
     

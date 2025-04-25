@@ -1,55 +1,39 @@
-import os
-import boto3
-from boto3.dynamodb.conditions import Key
-from datetime import datetime
-import json 
+from common.constants import (
+    NAME_TABLES,
+    DATA_FIELDS,
+)
+from common.validation_manager import (
+    is_valid_serial_key,
+    is_valid_sign,
+    is_valid_user_name,
+    is_valid_user_password,
+    is_valid_timestamp,
+)
+from common.http_manager import (
+    answer_to_web,
+    return_SUCCESS,
+    return_ERROR,
+)
+from common.table_manager import (
+    get_table,
+    set_item,
+    update_item,
+    delete_item,
+    get_user,
+    get_device,
+    append_in_string_data,
+    delete_from_string_data,
+)
+from common.datetime_manager import (
+    create_timestamp,
+    datetime_diff, # по хорошему, нужно проверить срок действия secret_key
+)
+from common.crypto_manager import (
+    generate_secret_key,
+)
 
-# Валидация серийного номера
-def is_valid_serial(query_string):
-    if 'serial' in query_string and len(query_string['serial']) > 0:
-        return True
-    else:
-        return False
 
-# Валидация подписи
-def is_valid_sig(query_string):
-    if 'sig' in query_string and len(query_string['sig']) > 0:
-        return True
-    else:
-        return False
 
-# Валидация временной метки
-def is_valid_time(query_string):
-    if 'time' in query_string and len(query_string['time']) > 0:
-        return True
-    else:
-        return False
-
-# Ответ от сервера
-def answer_to_web(code: int, message: str, data = ''):
-    return {
-            'statusCode': code,
-            'body': json.dumps({
-                'code': code,
-                'message': message,
-                'data': data
-            }),
-            'headers': {
-                'Content-Type': 'application/json'
-            }
-        }
-
-# Получение таблицы
-def get_table(table_name):
-    # Подключаемся к DynamoDB
-    ydb_docapi_client = boto3.resource(
-        'dynamodb', 
-        endpoint_url=os.getenv('ENDPOINT_URL'),
-        region_name=os.getenv('REGION_NAME'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-    )
-    return ydb_docapi_client.Table(table_name)
 
 def handler(event, context):
     print("-----------------------------")
@@ -58,53 +42,129 @@ def handler(event, context):
     p = event.get('queryStringParameters', {})
     print(p)
     
-    # Проверяем валидность всех параметров
-    a = is_valid_serial(p)
-    print(a)
-    b = is_valid_sig(p)
-    print(b)
-    c = is_valid_time(p)
-    print(c)
+    ########## Проверяем валидность всех параметров ##########
+    if (
+        not is_valid_serial_key(p)
+        or not is_valid_sign(p)
+        or not is_valid_timestamp(p)
+    ):
+        return return_ERROR()
+    
+# Если все параметры валидны
 
-    # Если все параметры валидны
-    if a and b and c :
-        print(p['serial'])
-        
-        # Получаем таблицу
-        table = get_table('waiting-table')
+    # Генерируем timestamp
+    timestamp = create_timestamp()
+    
+    # Получаем таблицу
+    waiting_table = get_table(NAME_TABLES.WAITING_TABLE)
+    print("Читаем данные")# [{'serial': '00000-12345-67890', 'timestamp': '20250411153130', ...}]
+    
+    device = get_device(table=waiting_table, serial_key=p[DATA_FIELDS.SERIAL_KEY])
+    print(device)
 
+# Если устройство в списке ожидания
+    if device:
+    # Если для устройства готов ключ привязки
+        bind_key = device.get(DATA_FIELDS.BIND_KEY)
+        if bind_key:
+            data = {
+                DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY]),
+                DATA_FIELDS.TIMESTAMP: str(timestamp),
+                DATA_FIELDS.BIND_KEY: str(bind_key),
+            }
+            return answer_to_web(202, 'Start binding', data=data)
+    
+    # Если для устройства готов секретный ключ
+        secret_key = device.get(DATA_FIELDS.SECRET_KEY)
+        user_name = device.get(DATA_FIELDS.USER_NAME)
+        if secret_key and user_name:
+            user_table = get_table(NAME_TABLES.USER_TABLE)
+            user_data = get_user(table=user_table, user_name=user_name)
+            if not user_data:
+                return return_ERROR()
 
-        print("Читаем данные")# [{'serial': '00000-12345-67890', 'timestamp': '20250411153130'}]
-        res = table.query(
-            KeyConditionExpression=Key('serial').eq(p['serial'])
-        )
-        items = res.get('Items', [])  # Список всех записей с этим serial
-        print(items)
-        
-        # Генерируем timestamp
-        curtime = datetime.now()
-        timestamp = curtime.strftime('%Y%m%d%H%M%S')
-        
-        # Записываем данные в таблицу
-        try:
-            response = table.put_item(
-                Item={
-                    'serial': p['serial'],
-                    'timestamp': timestamp #p['timestamp']
+            device_table = get_table(NAME_TABLES.DEVICE_TABLE)
+
+            new_device_item = {
+                DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY]),
+                DATA_FIELDS.SECRET_KEY: str(secret_key),
+                DATA_FIELDS.TIMESTAMP: str(timestamp),
+                DATA_FIELDS.USER_NAME: str(user_name),
+            }
+
+            # Добавляем новое устройство в список устройств
+            list_devices = append_in_string_data(
+                strind_struct=user_data[DATA_FIELDS.LIST_DEVICES],
+                key=p[DATA_FIELDS.SERIAL_KEY],
+                val={
+                    'name': 'Устройство_' + str(timestamp),
                 }
             )
+
+            # Записываем устройство в БД привязанных устройств
+            if not set_item(table=device_table, item=new_device_item):
+                return return_ERROR()
             
-            # Возвращаем успешный ответ
-            return answer_to_web(200, 'Данные успешно записаны', data = {
-                        'serial': p['serial'],
-                        'timestamp': timestamp
-                    })
+            # Записываем устройство в список устройств пользователя
+            if not update_item(
+                table=user_table, 
+                key_dict={DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME])},
+                field_name=DATA_FIELDS.LIST_DEVICES,
+                new_value=str(list_devices)
+            ):
+                return return_ERROR()
+            
+            # Удаляем из списка ожидания
+            if not delete_item(
+                waiting_table, 
+                DATA_FIELDS.SERIAL_KEY, 
+                p[DATA_FIELDS.SERIAL_KEY]
+            ):
+                return return_ERROR()
+            
+            data = {
+                DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY]),
+                DATA_FIELDS.TIMESTAMP: str(timestamp),
+                DATA_FIELDS.SECRET_KEY: str(secret_key),
+            }
+            return answer_to_web(201, 'Finish binding', data=data)
         
-        except Exception as e:
-            # Возвращаем ошибку, если запись в БД не удалась
-            return answer_to_web(500, 'Ошибка при записи данных в БД', data = str(e))
+    # Если устройство в списке ожидания,
+    # но не участвует в процессе привязки,
+    # то просто обновляем его время активности
+        if update_item(
+                table=waiting_table, 
+                key_dict={DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY])},
+                field_name=DATA_FIELDS.TIMESTAMP,
+                new_value=str(timestamp)
+        ):
+            return answer_to_web(300, 'Waiting, device not binding', data=device)
+        else:
+            return return_ERROR()
+
+# Если устройства нет в списке ожидания
+# проверяем привязано ли оно в списке привязанных устройств
+    device_table = get_table(NAME_TABLES.DEVICE_TABLE)
+    device = get_device(table=device_table, serial_key=p[DATA_FIELDS.SERIAL_KEY])
+    print(device)
+
+# Если устройство уже в списке привязанных
+    if device:
+        # Проверяем корректность его secret_key #########################################################
+        pass
+
+# Если устройства нет, ни в списке ожидания, ни в списке привязанных устройств
+# то помещаем его в список ожидающих привязки
+    device = {
+        DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY]),
+        DATA_FIELDS.TIMESTAMP: str(timestamp)
+    }
     
+    # Записываем устройство в таблицу ожидания
+    if set_item(table=waiting_table, item=device):
+        return answer_to_web(300, 'Waiting, device not binding', data=device)
     else:
-        # Возвращаем ошибку, если параметр 'name' отсутствует или пуст
-        return answer_to_web(400, 'Параметры отсутствуют или пусты')
+        return return_ERROR()
+    
+
     
