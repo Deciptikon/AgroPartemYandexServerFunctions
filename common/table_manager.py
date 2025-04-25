@@ -1,7 +1,7 @@
 import os
 import boto3
 from boto3.dynamodb.conditions import Key
-from common.constants import DATA_FIELDS, NAME_TABLES
+from constants import DATA_FIELDS, NAME_TABLES
 
 # Получение таблицы
 def get_table(table_name):

@@ -30,25 +30,34 @@ def fix_imports(file_path: Path) -> None:
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(new_content)
 
+import re
+from pathlib import Path
+from typing import Set
+
 def find_used_common_files(func_dir: Path) -> Set[str]:
-    """Находит все общие файлы, которые импортируются в функции."""
+    """Находит все общие файлы, импортируемые из `common` в заданном стиле."""
     used_files = set()
     
     for py_file in func_dir.glob("*.py"):
         with open(py_file, "r", encoding="utf-8") as f:
             content = f.read()
+            #print(content)
         
-        # Ищем все импорты вида `from common.{file}`
-        matches = re.finditer(
-            r"from\s+common\.([a-zA-Z0-9_]+)\s+import",
-            content
-        )
+        # Ищем такие стили импорта:
+        # 1. `from common.{module} import something`
+        # 2. `from common.{module} import (something, ...)`
+        pattern = r"from\s+common\.([a-zA-Z0-9_]+)\s+import\s+(?:\(?([a-zA-Z0-9_\s,*]+)\)?|([a-zA-Z0-9_*]+))"
+        
+        matches = re.finditer(pattern, content, re.MULTILINE)
         for match in matches:
-            used_files.add(f"{match.group(1)}.py")
+            module_name = match.group(1)  # Имя модуля (например, `constants`)
+            used_files.add(f"{module_name}.py")
     
+    print("Найдены модули из common:", used_files)
     return used_files
 
 # Очистка старых файлов
+print("Сборка запущена...")
 shutil.rmtree(BUILD_DIR, ignore_errors=True)
 shutil.rmtree(ZIP_OUTPUT, ignore_errors=True)
 os.makedirs(BUILD_DIR, exist_ok=True)
@@ -66,7 +75,7 @@ for func in FUNCTIONS:
         fix_imports(py_file)
     
     # 3. Копируем ТОЛЬКО используемые общие файлы
-    used_files = find_used_common_files(func_build)
+    used_files = find_used_common_files(func_src)
     for common_file in COMMON_DIR.glob("*.py"):
         if common_file.name in used_files:
             shutil.copy(common_file, func_build / common_file.name)
