@@ -53,7 +53,7 @@ def find_used_common_files(func_dir: Path) -> Set[str]:
             module_name = match.group(1)  # Имя модуля (например, `constants`)
             used_files.add(f"{module_name}.py")
     
-    print("Найдены модули из common:", used_files)
+    #print("Найдены модули из common:", used_files)
     return used_files
 
 # Очистка старых файлов
@@ -78,9 +78,12 @@ for func in FUNCTIONS:
     used_files = find_used_common_files(func_src)
     for common_file in COMMON_DIR.glob("*.py"):
         if common_file.name in used_files:
+            # Здесь можно добавить автоконфигурирование requirements.txt
+            # в зависимости от импортируемых модулей
             shutil.copy(common_file, func_build / common_file.name)
     
     # 4. Создаём ZIP
     shutil.make_archive(f"{ZIP_OUTPUT}/{func}", "zip", func_build)
+    print(f"Модуль '{func}' собран")
 
 print(f"✅ Сборка завершена! Архивы в '{ZIP_OUTPUT}/'")
