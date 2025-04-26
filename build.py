@@ -8,10 +8,11 @@ from typing import Set
 COMMON_DIR = Path("common")  # Папка общих файлов
 # Собираемые функции
 FUNCTIONS = [
-    "auth-func", 
-    "base-gateway", 
-    "device-manager",
-    "track-manager"
+    "device-auth",
+    "device-gps",
+    "user-auth", 
+    "user-devices",
+    "user-tracks"
     ]  
 BUILD_DIR = "build"          # Временная папка (там будут собранные функции)
 ZIP_OUTPUT = "zips"          # Папка для архивов
