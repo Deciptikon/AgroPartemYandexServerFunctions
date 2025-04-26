@@ -1,20 +1,22 @@
-from constants import (
+from torch import P
+from common.constants import (
     NAME_TABLES,
     DATA_FIELDS,
 )
-from validation_manager import (
+from common.validation_manager import (
     is_valid_serial_key,
     is_valid_sign,
     is_valid_user_name,
     is_valid_user_password,
     is_valid_timestamp,
 )
-from http_manager import (
+from common.http_manager import (
     answer_to_web,
     return_SUCCESS,
     return_ERROR,
+    build_sorted_query_string,
 )
-from table_manager import (
+from common.table_manager import (
     get_table,
     set_item,
     update_item,
@@ -24,12 +26,13 @@ from table_manager import (
     append_in_string_data,
     delete_from_string_data,
 )
-from datetime_manager import (
+from common.datetime_manager import (
     create_timestamp,
     datetime_diff, # по хорошему, нужно проверить срок действия secret_key
 )
-from crypto_manager import (
+from common.crypto_manager import (
     generate_secret_key,
+    generate_signature,
 )
 
 
@@ -41,6 +44,9 @@ def handler(event, context):
     # Получаем параметры запроса
     p = event.get('queryStringParameters', {})
     print(p)
+    
+    query_string = build_sorted_query_string(params=p, exclude_key=DATA_FIELDS.SIGN)
+    print(query_string)
     
     ########## Проверяем валидность всех параметров ##########
     if (
@@ -55,14 +61,14 @@ def handler(event, context):
     # Генерируем timestamp
     timestamp = create_timestamp()
     
-    # Получаем таблицу
+    # Получаем таблицу ожидания
     waiting_table = get_table(NAME_TABLES.WAITING_TABLE)
     print("Читаем данные")# [{'serial': '00000-12345-67890', 'timestamp': '20250411153130', ...}]
     
     device = get_device(table=waiting_table, serial_key=p[DATA_FIELDS.SERIAL_KEY])
     print(device)
 
-# Если устройство в списке ожидания
+# Если устройство в списке ожидания првоеряем наличие ключей
     if device:
     # Если для устройства готов ключ привязки
         bind_key = device.get(DATA_FIELDS.BIND_KEY)
@@ -92,7 +98,7 @@ def handler(event, context):
                 DATA_FIELDS.USER_NAME: str(user_name),
             }
 
-            # Добавляем новое устройство в список устройств
+            # Добавляем новое устройство в список устройств пользователя
             list_devices = append_in_string_data(
                 strind_struct=user_data[DATA_FIELDS.LIST_DEVICES],
                 key=p[DATA_FIELDS.SERIAL_KEY],
@@ -143,7 +149,7 @@ def handler(event, context):
             return return_ERROR()
 
 # Если устройства нет в списке ожидания
-# проверяем привязано ли оно в списке привязанных устройств
+# проверяем находится ли оно в списке привязанных устройств
     device_table = get_table(NAME_TABLES.DEVICE_TABLE)
     device = get_device(table=device_table, serial_key=p[DATA_FIELDS.SERIAL_KEY])
     print(device)
@@ -151,7 +157,25 @@ def handler(event, context):
 # Если устройство уже в списке привязанных
     if device:
         # Проверяем корректность его secret_key #########################################################
-        pass
+        local_secret_key = device.get(DATA_FIELDS.SECRET_KEY)
+        if not local_secret_key:
+            return return_ERROR()
+        
+        # Генерируем подпись к присланным данным от пользователя
+        local_sign = generate_signature(
+            unsigned_url=build_sorted_query_string(
+                params=p, 
+                exclude_key=DATA_FIELDS.SIGN
+                ),
+            secret_key=local_secret_key
+        )
+        print('Local Sign: ', local_sign)
+
+        # Если подписи совпадают, значит устройство привязано
+        if local_sign != p[DATA_FIELDS.SIGN]:
+            return return_ERROR()
+        
+        return return_SUCCESS()
 
 # Если устройства нет, ни в списке ожидания, ни в списке привязанных устройств
 # то помещаем его в список ожидающих привязки

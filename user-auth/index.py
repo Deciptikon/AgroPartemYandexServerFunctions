@@ -14,6 +14,8 @@ from common.http_manager import (
 from common.table_manager import (
     get_table,
     get_user,
+    set_item,
+    update_item,
 )
 from common.datetime_manager import (
     create_timestamp,
@@ -47,19 +49,20 @@ def handler(event, context):
 # Если пользователь не существует, 
 # регистрируем нового пользователя
         timestamp = create_timestamp()
-        new_item = {
+        new_user = {
             DATA_FIELDS.USER_PASSWORD: str(p[DATA_FIELDS.USER_PASSWORD]),
             DATA_FIELDS.USER_NIKNAME: str('User_' + timestamp),
             DATA_FIELDS.TIMESTAMP: str(timestamp),
             DATA_FIELDS.USER_NAME: str(p[DATA_FIELDS.USER_NAME]),
         }
-        try:
-            response = user_table.put_item(Item = new_item)
-            return return_SUCCESS(data=new_item)
-    
-        except Exception as e:
-            # Возвращаем ошибку, если запись в БД не удалась
+
+        if not set_item(
+            table=user_table,
+            item=new_user
+        ):
             return return_ERROR()
+        
+        return return_SUCCESS(data=new_user)
     
 # Если пользователь существует
 # проверяем пароль
@@ -69,31 +72,28 @@ def handler(event, context):
     
     # Если пароль верный, генерируем секретный ключ
     secret_key = generate_secret_key(64)
-
     timestamp = create_timestamp()
 
-    # формируем ответ
-    item = {
-        DATA_FIELDS.USER_PASSWORD: str(user_data[DATA_FIELDS.USER_PASSWORD]),
-        DATA_FIELDS.USER_NIKNAME: str(user_data[DATA_FIELDS.USER_NIKNAME]),
-        DATA_FIELDS.LIST_DEVICES: str(user_data[DATA_FIELDS.LIST_DEVICES]),
-        DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),
-        DATA_FIELDS.TIMESTAMP: str(timestamp),
-        DATA_FIELDS.SECRET_KEY: str(secret_key),
-    }
-    print(item)
+    if not update_item(
+        table=user_table,
+        key_dict={DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),},
+        field_name=DATA_FIELDS.SECRET_KEY,
+        new_value=str(secret_key)
+    ):
+        return return_ERROR()
+    
+    if not update_item(
+        table=user_table,
+        key_dict={DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),},
+        field_name=DATA_FIELDS.TIMESTAMP,
+        new_value=str(timestamp)
+    ):
+        return return_ERROR()
 
-    # записываем токен и время его создания в текущего пользователя
-    try:
-        response = user_table.put_item(Item = item)
-        # Если запись прошла успешно, возвращаем успешный ответ с новым токеном
-        data = {
+    data = {
             DATA_FIELDS.USER_NAME: str(user_data[DATA_FIELDS.USER_NAME]),
             DATA_FIELDS.TIMESTAMP: str(timestamp),
             DATA_FIELDS.SECRET_KEY: str(secret_key),
         }
-        return return_SUCCESS(data=data)
-    except Exception as e:
-        # Возвращаем ошибку, если запись в БД не удалась
-        return return_ERROR()
+    return return_SUCCESS(data=data)
     
