@@ -80,17 +80,23 @@ def handler(event, context):
     if not list_tracks:
         # Если треков нет, инициализируем
         list_tracks = {}
-    
+    else:
+        list_tracks = eval(list_tracks)
+
     near_track = None
+    min_time = 3600
     # ищем ближайший трек
     for key in list_tracks.keys():
-        if datetime_diff(
-            start_date_str=list_tracks[key],
-            end_date_str=timestamp
-        ) < 3600:
+        t = datetime_diff(
+                start_date_str=str(list_tracks[key][DATA_FIELDS.TIMESTAMP]),
+                end_date_str=timestamp
+            )
+        print("time = ", t)
+        if t < min_time:
             # Здесь же можно добавить и ограничение 
             # на максимальное отклонение от начальной точки...
             near_track = key
+            min_time = t
     
     # Если ближайший трек обнаружен
     if near_track:
@@ -128,6 +134,8 @@ def handler(event, context):
             new_value=str(track)
         ):
             return return_ERROR()
+        
+        return return_SUCCESS()
     
     # Если ближайшего нет, создаём новый
     list_tracks[track_key] = {

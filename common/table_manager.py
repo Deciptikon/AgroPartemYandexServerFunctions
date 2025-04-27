@@ -1,6 +1,7 @@
 import os
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.http_manager import return_ERROR
 from constants import DATA_FIELDS, NAME_TABLES
 
 # Получение таблицы
