@@ -22,7 +22,7 @@ list_devices = {
 
 str_list = str(list_devices)
 ttt = append_in_string_data(
-    strind_struct=str_list,
+    string_struct=str_list,
     key='99999-ABCDE-99999',
     val={'name': "99999999999"}
 )

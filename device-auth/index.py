@@ -1,4 +1,3 @@
-from torch import P
 from common.constants import (
     NAME_TABLES,
     DATA_FIELDS,
@@ -6,8 +5,6 @@ from common.constants import (
 from common.validation_manager import (
     is_valid_serial_key,
     is_valid_sign,
-    is_valid_user_name,
-    is_valid_user_password,
     is_valid_timestamp,
 )
 from common.http_manager import (
@@ -31,7 +28,6 @@ from common.datetime_manager import (
     datetime_diff, # по хорошему, нужно проверить срок действия secret_key
 )
 from common.crypto_manager import (
-    generate_secret_key,
     generate_signature,
 )
 
@@ -44,7 +40,7 @@ def handler(event, context):
     # Получаем параметры запроса
     p = event.get('queryStringParameters', {})
     print(p)
-    
+
     query_string = build_sorted_query_string(params=p, exclude_key=DATA_FIELDS.SIGN)
     print(query_string)
     
@@ -100,7 +96,7 @@ def handler(event, context):
 
             # Добавляем новое устройство в список устройств пользователя
             list_devices = append_in_string_data(
-                strind_struct=user_data[DATA_FIELDS.LIST_DEVICES],
+                string_struct=user_data.get(DATA_FIELDS.LIST_DEVICES),
                 key=p[DATA_FIELDS.SERIAL_KEY],
                 val={
                     'name': 'Устройство_' + str(timestamp),

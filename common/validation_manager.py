@@ -40,6 +40,7 @@ def is_valid_sign(query_string: str, secret_key: str = None):
             # нужно отбросить sign,
             # создать локальную подпись с secret_key, 
             # сравнить обе подписи
+            
             sign = '0'
             local_sign = '0'
             if local_sign == sign:

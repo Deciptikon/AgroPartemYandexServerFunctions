@@ -110,13 +110,32 @@ def get_device(table, serial_key: str):
         return items[0]
     else:
         return None
+    
+def get_track(table, track_key: str):
+    if track_key == '':
+        return None
+    
+    items = get_items(
+        table = table, 
+        key = DATA_FIELDS.TRACK_KEY, 
+        val = track_key)
+    
+    if len(items) == 1:
+        return items[0]
+    else:
+        return None
 
 # Добавление записи в строковую структуру
-def append_in_string_data(strind_struct: str, key: str, val: any):
+def append_in_string_data(string_struct: str, key: str, val: any):
     if len(key) == 0:
-        return strind_struct
+        return string_struct
     
-    struct = eval(strind_struct)
+    if not string_struct or len(string_struct) == 0:
+        struct = {}
+        struct[key] = val
+        return str(struct)
+    
+    struct = eval(string_struct)
     struct[key] = val
     return str(struct)
 

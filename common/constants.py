@@ -29,6 +29,12 @@ class DataFields:
     GET_LIST_TRACKS: str = 'get_list_tracks'
     LIST_DEVICES: str = 'list_devices'
     LIST_TRACKS: str = 'list_tracks'
+    TRACK_KEY: str = 'track_key'
+    TRACK_LAT: str = 'track_lat'
+    TRACK_LON: str = 'track_lon'
+    TRACK_TIME: str = 'track_time'
+    GPS_DATA: str = 'gps_data'
+    LENGTH_TRACK: str = 'length_track'
 
 DATA_FIELDS = DataFields()
 

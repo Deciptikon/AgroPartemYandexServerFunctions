@@ -10,8 +10,8 @@ def generate_secret_key(length: int = 64) -> str:
     :param length: Длина ключа (по умолчанию 64 символа)
     :return: Случайная строка из букв и цифр
     """
-    if length < 8:
-        raise ValueError("Длина ключа должна быть не менее 8 символов")
+    if length < 6:
+        raise ValueError("Длина ключа должна быть не менее 6 символов")
     
     alphabet = string.ascii_letters + string.digits  # Буквы (A-Z, a-z) + цифры (0-9)
     return ''.join(secrets.choice(alphabet) for _ in range(length))
