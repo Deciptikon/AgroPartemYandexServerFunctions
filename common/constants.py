@@ -27,6 +27,7 @@ class DataFields:
     CHECK_BIND_KEY: str = 'check_bind_key'
     GET_LIST_DEVICES: str = 'get_list_devices'
     GET_LIST_TRACKS: str = 'get_list_tracks'
+    GET_TRACK_DATA: str = 'get_track_data'
     LIST_DEVICES: str = 'list_devices'
     LIST_TRACKS: str = 'list_tracks'
     TRACK_KEY: str = 'track_key'

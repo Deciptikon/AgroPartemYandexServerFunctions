@@ -21,6 +21,7 @@ from common.table_manager import (
     get_items,
     get_user,
     get_device,
+    get_track,
     update_item,
 )
 from common.datetime_manager import (
@@ -96,5 +97,18 @@ def handler(event, context):
             DATA_FIELDS.LIST_TRACKS: str(list_tracks)
         }
         return return_SUCCESS(data=data)
+    
+    # Если пользователь запрашивает получение данных трека
+    if p.get(DATA_FIELDS.GET_TRACK_DATA):
+        track_key = p.get(DATA_FIELDS.TRACK_KEY)
+        if not track_key or len(track_key) != 32:
+            return return_ERROR()
+        
+        track_table = get_table(NAME_TABLES.TRACK_TABLE)
+        track = get_track(table=track_table, track_key=track_key)
+        if not track:
+            return return_ERROR()
+        
+        return return_SUCCESS(data=track)
 
     return return_SUCCESS()
