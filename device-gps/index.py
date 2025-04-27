@@ -131,7 +131,7 @@ def handler(event, context):
             table=device_table, 
             key_dict={DATA_FIELDS.SERIAL_KEY: str(p[DATA_FIELDS.SERIAL_KEY])},
             field_name=DATA_FIELDS.LIST_TRACKS,
-            new_value=str(track)
+            new_value=str(list_tracks)
         ):
             return return_ERROR()
         
